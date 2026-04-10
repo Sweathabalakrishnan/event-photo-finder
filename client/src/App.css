@@ -206,23 +206,5 @@
   background: #f3f4f6;
 }
 
-.gallery-name {
-  font-size: 14px;
-  font-weight: 600;
-  word-break: break-word;
-  margin-bottom: 12px;
-}
-.galleryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
-}
 
-.galleryCard {
-  border: 1px solid #dbe3ee;
-  border-radius: 18px;
-  padding: 14px;
-  background: #ffffff;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-}
 
