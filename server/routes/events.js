@@ -15,7 +15,7 @@ import { readJson, writeJson } from "../utils/fileDb.js";
 import { EVENTS_DB, EVENTS_DIR, SELFIES_DIR } from "../utils/paths.js";
 
 const router = express.Router();
-const AI_BASE = "http://127.0.0.1:8000";
+const AI_BASE = process.env.AI_BASE_URL || "http://127.0.0.1:8000";
 
 /* ---------------------------
    Multer setup for reference photos
