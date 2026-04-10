@@ -1,25 +1,88 @@
 import React, { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+function getBackendBaseUrl() {
+  const apiUrl = import.meta.env.VITE_API_URL || "";
+
+  // If env is like https://domain.com/api -> remove /api
+  if (apiUrl.endsWith("/api")) {
+    return apiUrl.slice(0, -4);
+  }
+
+  return apiUrl;
+}
+
+function normalizeMatchItem(item, eventCode, backendBaseUrl, index) {
+  // Case 1: match is just a filename string
+  if (typeof item === "string") {
+    return {
+      id: `${item}-${index}`,
+      filename: item,
+      imageUrl:
+        eventCode && backendBaseUrl
+          ? `${backendBaseUrl}/uploads/events/${eventCode}/${encodeURIComponent(
+              item
+            )}`
+          : "",
+    };
+  }
+
+  // Case 2: match is already an object
+  if (item && typeof item === "object") {
+    const filename = item.filename || `matched-photo-${index + 1}.jpg`;
+
+    let imageUrl = item.imageUrl || "";
+
+    if (!imageUrl && eventCode && backendBaseUrl && filename) {
+      imageUrl = `${backendBaseUrl}/uploads/events/${eventCode}/${encodeURIComponent(
+        filename
+      )}`;
+    }
+
+    return {
+      id: item.id || `${filename}-${index}`,
+      filename,
+      imageUrl,
+    };
+  }
+
+  return {
+    id: `unknown-${index}`,
+    filename: `matched-photo-${index + 1}.jpg`,
+    imageUrl: "",
+  };
+}
 
 export default function Gallery() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const [downloading, setDownloading] = useState("");
+  const [downloadingId, setDownloadingId] = useState("");
   const [imageErrors, setImageErrors] = useState({});
 
-  const galleryData = useMemo(() => {
-    const state = location.state || {};
+  const backendBaseUrl = getBackendBaseUrl();
 
-    return {
-      matches: Array.isArray(state.matches) ? state.matches : [],
-      personName: state.personName || state.name || "Guest",
-      eventCode: state.eventCode || "",
-      loading: Boolean(state.loading)
-    };
-  }, [location.state]);
+  const state = location.state || {};
 
-  const { matches, personName, eventCode, loading } = galleryData;
+  const personName =
+    state.personName ||
+    state.name ||
+    searchParams.get("name") ||
+    "Guest";
+
+  const eventCode =
+    state.eventCode ||
+    searchParams.get("eventCode") ||
+    "";
+
+  const rawMatches = Array.isArray(state.matches) ? state.matches : [];
+
+  const matches = useMemo(() => {
+    return rawMatches.map((item, index) =>
+      normalizeMatchItem(item, eventCode, backendBaseUrl, index)
+    );
+  }, [rawMatches, eventCode, backendBaseUrl]);
 
   const handleBackHome = () => {
     navigate("/");
@@ -27,26 +90,23 @@ export default function Gallery() {
 
   const handleView = (imageUrl) => {
     if (!imageUrl) {
-      alert("Image URL not available");
+      alert("Image URL not available.");
       return;
     }
 
     window.open(imageUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handleDownload = async (imageUrl, filename) => {
+  const handleDownload = async (imageUrl, filename, id) => {
     if (!imageUrl) {
-      alert("Image URL not available");
+      alert("Image URL not available.");
       return;
     }
 
     try {
-      setDownloading(filename || "downloading");
+      setDownloadingId(id);
 
-      const response = await fetch(imageUrl, {
-        method: "GET"
-      });
-
+      const response = await fetch(imageUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch image (${response.status})`);
       }
@@ -66,14 +126,14 @@ export default function Gallery() {
       console.error("Download failed:", error);
       alert("Download failed. Please try again.");
     } finally {
-      setDownloading("");
+      setDownloadingId("");
     }
   };
 
-  const handleImageError = (filename) => {
+  const onImageError = (id) => {
     setImageErrors((prev) => ({
       ...prev,
-      [filename]: true
+      [id]: true,
     }));
   };
 
@@ -86,7 +146,7 @@ export default function Gallery() {
             alignItems: "center",
             justifyContent: "space-between",
             gap: "12px",
-            marginBottom: "16px"
+            marginBottom: "18px",
           }}
         >
           <div>
@@ -94,15 +154,14 @@ export default function Gallery() {
               className="cardTitle"
               style={{
                 fontSize: "clamp(2rem, 4vw, 3rem)",
-                marginBottom: "10px"
+                marginBottom: "10px",
               }}
             >
               Your Matched Photos
             </h1>
 
-            <p className="cardText" style={{ marginBottom: "0" }}>
+            <p className="cardText" style={{ marginBottom: 0 }}>
               Results for {personName}
-              {eventCode ? ` • Event Code: ${eventCode}` : ""}
             </p>
           </div>
 
@@ -111,48 +170,33 @@ export default function Gallery() {
           </button>
         </div>
 
-        {loading && (
-          <div className="emptyState">
-            <h3>Loading matched photos...</h3>
-            <p>Please wait while we prepare your gallery.</p>
-          </div>
-        )}
-
-        {!loading && matches.length === 0 && (
+        {matches.length === 0 ? (
           <div className="emptyState">
             <h3>No matched photos found</h3>
-            <p>
-              We could not find matching images right now. Please try with
-              clearer reference photos.
-            </p>
+            <p>Please try again with clearer reference photos.</p>
           </div>
-        )}
-
-        {!loading && matches.length > 0 && (
+        ) : (
           <div
             className="galleryGrid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "18px"
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: "18px",
             }}
           >
-            {matches.map((photo, index) => {
-              const filename =
-                photo?.filename || `matched-photo-${index + 1}.jpg`;
-              const imageUrl = photo?.imageUrl || "";
-              const imageFailed = imageErrors[filename];
+            {matches.map((photo) => {
+              const imageFailed = imageErrors[photo.id];
 
               return (
                 <div
-                  key={`${filename}-${index}`}
+                  key={photo.id}
                   className="galleryCard"
                   style={{
                     border: "1px solid #dbe3ee",
                     borderRadius: "18px",
                     padding: "14px",
                     background: "#ffffff",
-                    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)"
+                    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)",
                   }}
                 >
                   <div
@@ -161,32 +205,32 @@ export default function Gallery() {
                       height: "180px",
                       borderRadius: "14px",
                       overflow: "hidden",
-                      background: "#f1f5f9",
+                      background: "#eef2f7",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      marginBottom: "14px"
+                      marginBottom: "14px",
                     }}
                   >
-                    {!imageFailed && imageUrl ? (
+                    {!imageFailed && photo.imageUrl ? (
                       <img
-                        src={imageUrl}
-                        alt={filename}
+                        src={photo.imageUrl}
+                        alt={photo.filename}
                         style={{
                           width: "100%",
                           height: "100%",
                           objectFit: "cover",
-                          display: "block"
+                          display: "block",
                         }}
-                        onError={() => handleImageError(filename)}
+                        onError={() => onImageError(photo.id)}
                       />
                     ) : (
                       <div
                         style={{
-                          padding: "12px",
                           textAlign: "center",
                           color: "#64748b",
-                          fontSize: "14px"
+                          fontSize: "14px",
+                          padding: "10px",
                         }}
                       >
                         Image preview not available
@@ -202,10 +246,10 @@ export default function Gallery() {
                       lineHeight: 1.5,
                       wordBreak: "break-word",
                       marginBottom: "14px",
-                      minHeight: "48px"
+                      minHeight: "48px",
                     }}
                   >
-                    {filename}
+                    {photo.filename}
                   </p>
 
                   <div
@@ -213,21 +257,23 @@ export default function Gallery() {
                     style={{
                       display: "flex",
                       gap: "10px",
-                      flexWrap: "wrap"
+                      flexWrap: "wrap",
                     }}
                   >
                     <button
                       className="btn btnPrimary"
-                      onClick={() => handleDownload(imageUrl, filename)}
-                      disabled={!imageUrl || downloading === filename}
+                      onClick={() =>
+                        handleDownload(photo.imageUrl, photo.filename, photo.id)
+                      }
+                      disabled={!photo.imageUrl || downloadingId === photo.id}
                     >
-                      {downloading === filename ? "Downloading..." : "Download"}
+                      {downloadingId === photo.id ? "Downloading..." : "Download"}
                     </button>
 
                     <button
                       className="btn"
-                      onClick={() => handleView(imageUrl)}
-                      disabled={!imageUrl}
+                      onClick={() => handleView(photo.imageUrl)}
+                      disabled={!photo.imageUrl}
                     >
                       View
                     </button>
