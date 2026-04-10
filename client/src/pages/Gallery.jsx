@@ -1,11 +1,54 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-export default function Gallery({ matches = [], personName = "" }) {
-  async function handleDownload(imageUrl, filename) {
+export default function Gallery() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [downloading, setDownloading] = useState("");
+  const [imageErrors, setImageErrors] = useState({});
+
+  const galleryData = useMemo(() => {
+    const state = location.state || {};
+
+    return {
+      matches: Array.isArray(state.matches) ? state.matches : [],
+      personName: state.personName || state.name || "Guest",
+      eventCode: state.eventCode || "",
+      loading: Boolean(state.loading)
+    };
+  }, [location.state]);
+
+  const { matches, personName, eventCode, loading } = galleryData;
+
+  const handleBackHome = () => {
+    navigate("/");
+  };
+
+  const handleView = (imageUrl) => {
+    if (!imageUrl) {
+      alert("Image URL not available");
+      return;
+    }
+
+    window.open(imageUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownload = async (imageUrl, filename) => {
+    if (!imageUrl) {
+      alert("Image URL not available");
+      return;
+    }
+
     try {
-      const response = await fetch(imageUrl);
+      setDownloading(filename || "downloading");
+
+      const response = await fetch(imageUrl, {
+        method: "GET"
+      });
+
       if (!response.ok) {
-        throw new Error("Failed to fetch image");
+        throw new Error(`Failed to fetch image (${response.status})`);
       }
 
       const blob = await response.blob();
@@ -13,7 +56,7 @@ export default function Gallery({ matches = [], personName = "" }) {
 
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = filename || "image.jpg";
+      link.download = filename || "matched-photo.jpg";
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -21,49 +64,179 @@ export default function Gallery({ matches = [], personName = "" }) {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download failed:", error);
-      alert("Download failed");
+      alert("Download failed. Please try again.");
+    } finally {
+      setDownloading("");
     }
-  }
+  };
 
-  function handleView(imageUrl) {
-    window.open(imageUrl, "_blank", "noopener,noreferrer");
-  }
+  const handleImageError = (filename) => {
+    setImageErrors((prev) => ({
+      ...prev,
+      [filename]: true
+    }));
+  };
 
   return (
     <section className="section">
       <div className="card">
-        <h1 className="pageTitle">Your Matched Photos</h1>
-        <p className="cardText">Results for {personName}</p>
+        <div
+          className="eventHeader"
+          style={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            marginBottom: "16px"
+          }}
+        >
+          <div>
+            <h1
+              className="cardTitle"
+              style={{
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                marginBottom: "10px"
+              }}
+            >
+              Your Matched Photos
+            </h1>
 
-        <div className="gallery-grid">
-          {matches.map((photo, index) => (
-            <div key={index} className="gallery-card">
-              <img
-                src={photo.imageUrl}
-                alt={photo.filename}
-                className="gallery-image"
-              />
+            <p className="cardText" style={{ marginBottom: "0" }}>
+              Results for {personName}
+              {eventCode ? ` • Event Code: ${eventCode}` : ""}
+            </p>
+          </div>
 
-              <p className="gallery-name">{photo.filename}</p>
-
-              <div className="btnRow">
-                <button
-                  className="btn btnPrimary"
-                  onClick={() => handleDownload(photo.imageUrl, photo.filename)}
-                >
-                  Download
-                </button>
-
-                <button
-                  className="btn"
-                  onClick={() => handleView(photo.imageUrl)}
-                >
-                  View
-                </button>
-              </div>
-            </div>
-          ))}
+          <button className="btn" onClick={handleBackHome}>
+            Back to Home
+          </button>
         </div>
+
+        {loading && (
+          <div className="emptyState">
+            <h3>Loading matched photos...</h3>
+            <p>Please wait while we prepare your gallery.</p>
+          </div>
+        )}
+
+        {!loading && matches.length === 0 && (
+          <div className="emptyState">
+            <h3>No matched photos found</h3>
+            <p>
+              We could not find matching images right now. Please try with
+              clearer reference photos.
+            </p>
+          </div>
+        )}
+
+        {!loading && matches.length > 0 && (
+          <div
+            className="galleryGrid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "18px"
+            }}
+          >
+            {matches.map((photo, index) => {
+              const filename =
+                photo?.filename || `matched-photo-${index + 1}.jpg`;
+              const imageUrl = photo?.imageUrl || "";
+              const imageFailed = imageErrors[filename];
+
+              return (
+                <div
+                  key={`${filename}-${index}`}
+                  className="galleryCard"
+                  style={{
+                    border: "1px solid #dbe3ee",
+                    borderRadius: "18px",
+                    padding: "14px",
+                    background: "#ffffff",
+                    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)"
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "180px",
+                      borderRadius: "14px",
+                      overflow: "hidden",
+                      background: "#f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: "14px"
+                    }}
+                  >
+                    {!imageFailed && imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={filename}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block"
+                        }}
+                        onError={() => handleImageError(filename)}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          padding: "12px",
+                          textAlign: "center",
+                          color: "#64748b",
+                          fontSize: "14px"
+                        }}
+                      >
+                        Image preview not available
+                      </div>
+                    )}
+                  </div>
+
+                  <p
+                    style={{
+                      fontWeight: 700,
+                      color: "#0f172a",
+                      fontSize: "15px",
+                      lineHeight: 1.5,
+                      wordBreak: "break-word",
+                      marginBottom: "14px",
+                      minHeight: "48px"
+                    }}
+                  >
+                    {filename}
+                  </p>
+
+                  <div
+                    className="btnRow"
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap"
+                    }}
+                  >
+                    <button
+                      className="btn btnPrimary"
+                      onClick={() => handleDownload(imageUrl, filename)}
+                      disabled={!imageUrl || downloading === filename}
+                    >
+                      {downloading === filename ? "Downloading..." : "Download"}
+                    </button>
+
+                    <button
+                      className="btn"
+                      onClick={() => handleView(imageUrl)}
+                      disabled={!imageUrl}
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
