@@ -54,7 +54,7 @@ function eventPhotoStorage(eventCode) {
 /* ---------------------------
    Create event
 ---------------------------- */
-router.post("/create", (req, res) => {
+router.post("/", (req, res) => {
   try {
     const { name, date, venue } = req.body;
 
