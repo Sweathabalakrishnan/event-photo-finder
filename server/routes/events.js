@@ -56,6 +56,8 @@ function eventPhotoStorage(eventCode) {
 ---------------------------- */
 router.post("/", (req, res) => {
   try {
+    console.log("POST /api/events body:", req.body);
+
     const { name, date, venue } = req.body;
 
     if (!name || !date || !venue) {
@@ -81,13 +83,13 @@ router.post("/", (req, res) => {
 
     return res.json(event);
   } catch (error) {
+    console.error("Create event error:", error);
     return res.status(500).json({
       error: "Failed to create event",
       details: error.message
     });
   }
 });
-
 /* ---------------------------
    Get event by code
 ---------------------------- */
