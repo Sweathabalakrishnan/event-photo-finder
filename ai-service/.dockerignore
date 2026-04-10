@@ -1,1 +1,7 @@
-
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.deepface/weights
+face_crops
+reference_crops
