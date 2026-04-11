@@ -57,7 +57,9 @@ export default function Gallery() {
     "";
 
   const rawMatches = Array.isArray(state.matches) ? state.matches : [];
-
+  console.log("GALLERY STATE:", state);
+  console.log("EVENT CODE IN GALLERY:", eventCode);
+  console.log("RAW MATCHES:", rawMatches);
   const matches = useMemo(() => {
     return rawMatches.map((item, index) =>
       normalizeMatchItem(item, eventCode, backendBaseUrl, index)
