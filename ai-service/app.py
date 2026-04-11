@@ -592,8 +592,6 @@
 #         "event_code": event_code,
 #         "clusters": summary}
 
-
-
 import os
 import json
 import math
@@ -715,10 +713,6 @@ def cosine_distance(vec1, vec2):
 
 
 def score_to_confidence(score: float) -> float:
-    """
-    Lower score = higher confidence.
-    Maps typical match score range to 0-100.
-    """
     conf = 100.0 * (1.0 - min(max((score - 0.05) / 0.65, 0.0), 1.0))
     return round(conf, 2)
 
@@ -815,10 +809,6 @@ def save_largest_reference_crop(image_path: str, out_dir: str):
 # CLUSTERING
 # -----------------------------------
 def assign_clusters(records):
-    """
-    Auto-cluster indexed faces per event using ArcFace score.
-    This groups likely same-person faces across different photos.
-    """
     clusters = []
 
     for idx, record in enumerate(records):
@@ -871,12 +861,17 @@ def root():
 # INDEX EVENT PHOTO
 # -----------------------------------
 @app.post("/index-photo")
-async def index_photo(event_code: str = Form(...), file: UploadFile = File(...)):
+async def index_photo(
+    event_code: str = Form(...),
+    original_filename: str = Form(...),
+    file: UploadFile = File(...)
+):
     print("\n==================================================")
     print("INDEXING EVENT PHOTO")
     print("==================================================")
     print("[EVENT CODE]", event_code)
     print("[FILE NAME ]", file.filename)
+    print("[ORIGINAL  ]", original_filename)
 
     temp_path = None
 
@@ -887,15 +882,15 @@ async def index_photo(event_code: str = Form(...), file: UploadFile = File(...))
         if not os.path.exists(temp_path):
             print("[ERROR] Temp photo path does not exist")
             return {
-                "filename": os.path.basename(temp_path),
+                "filename": original_filename,
                 "faces_indexed": 0,
                 "error": "Temp photo path does not exist"
             }
 
         records = load_event_embeddings(event_code)
         crop_dir = event_crop_dir(event_code)
-        filename = os.path.basename(temp_path)
 
+        filename = original_filename
         records = [r for r in records if r["filename"] != filename]
 
         faces = detect_faces(temp_path)
@@ -969,7 +964,7 @@ async def index_photo(event_code: str = Form(...), file: UploadFile = File(...))
     except Exception as e:
         print("[INDEX ROUTE ERROR]", str(e))
         return {
-            "filename": os.path.basename(temp_path) if temp_path else (file.filename or "unknown"),
+            "filename": original_filename,
             "faces_indexed": 0,
             "error": str(e)
         }
@@ -1221,5 +1216,4 @@ def cluster_summary(event_code: str):
         "event_code": event_code,
         "clusters": summary
     }
-
 
