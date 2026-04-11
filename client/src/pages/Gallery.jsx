@@ -22,6 +22,11 @@ function normalizeMatchItem(item, eventCode, backendBaseUrl, index) {
     imageUrl = item.imageUrl || item.url || "";
   }
 
+  // localhost URL வந்தா production backend URL-ஆ மாற்று
+ if (imageUrl.startsWith("http://localhost")) {
+  imageUrl = imageUrl.replace("http://localhost:5000", backendBaseUrl);
+}
+
   if (!imageUrl && filename && backendBaseUrl && eventCode) {
     imageUrl = `${backendBaseUrl}/uploads/events/${eventCode}/${encodeURIComponent(
       filename
@@ -57,9 +62,7 @@ export default function Gallery() {
     "";
 
   const rawMatches = Array.isArray(state.matches) ? state.matches : [];
-  console.log("GALLERY STATE:", state);
-  console.log("EVENT CODE IN GALLERY:", eventCode);
-  console.log("RAW MATCHES:", rawMatches);
+
   const matches = useMemo(() => {
     return rawMatches.map((item, index) =>
       normalizeMatchItem(item, eventCode, backendBaseUrl, index)
