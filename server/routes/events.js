@@ -1,5 +1,3 @@
-
-
 import express from "express";
 import multer from "multer";
 import fs from "fs";
@@ -147,8 +145,11 @@ router.post(
 
       for (const file of req.files) {
         try {
+          const storedFilename = path.basename(file.path);
+
           const form = new FormData();
           form.append("event_code", eventCode);
+          form.append("original_filename", storedFilename);
           form.append("file", fs.createReadStream(file.path));
 
           const response = await axios.post(`${AI_BASE}/index-photo`, form, {
@@ -158,7 +159,7 @@ router.post(
           });
 
           indexed.push({
-            filename: path.basename(file.path),
+            filename: storedFilename,
             result: response.data
           });
         } catch (err) {
