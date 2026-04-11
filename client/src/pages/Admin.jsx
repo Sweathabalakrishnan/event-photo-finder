@@ -95,8 +95,9 @@ export default function Admin() {
       setUploading(false);
     }
   };
-
-  const eventUrl = event ? `http://localhost:5173/event/${event.eventCode}` : "";
+const eventUrl = event
+  ? `${window.location.origin}/event/${event.eventCode}`
+  : "";
 
   return (
     <section className="section">
